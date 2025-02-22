@@ -26,6 +26,18 @@ char rotateChar(char chr, int x) {
   return rotChr < (int)'A' ? (int)'Z' - ((int)'A' - rotChr) + 1: (char)rotChr;
 }
 
+void checkDictionary(char *inputWord, int *dictMatches) {
+  int j;
+  int dictSize = cs642GetDictSize();
+
+  for (j = 0; j < dictSize; j++) {
+    struct DictWord dictWord = cs642GetWordfromDict(j);
+    if (strcmp(inputWord, dictWord.word) == 0) {
+      *dictMatches = *dictMatches + 1;
+    }
+  }
+}
+
 
 //
 // Functions
@@ -63,39 +75,32 @@ int cs642StudentInit(void) {
 int cs642PerformROTXCryptanalysis(char *ciphertext, int clen, char *plaintext,
                                   int plen, uint8_t *key) {
 
-  int i, j;
+  int i;
   uint8_t k;
-  char *cipherdup = strdup(ciphertext);
-  int dictSize = cs642GetDictSize();
-  int *wordMatches = calloc(NALPHABETS - 1, sizeof(int));
+  char *decryption = strdup(ciphertext);
   int maxMatches = 0;
 
   for (k = 1; k < NALPHABETS; k++) {
     for (i = 0; i < clen; i++) {
       if (ciphertext[i] == ' ')
         continue;
-      cipherdup[i] = rotateChar(ciphertext[i], k);
+      decryption[i] = rotateChar(ciphertext[i], k);
     }
-    char *cipherdup2 = strdup(cipherdup);
+    char *decryptionDup = strdup(decryption);
     char *delim = " ";
-    char *tok = strtok(cipherdup2, delim);
+    char *tok = strtok(decryptionDup, delim);
+    int dictMatches = 0;
     while (tok != NULL) {
-      for (j = 0; j < dictSize; j++) {
-        struct DictWord word = cs642GetWordfromDict(j);
-        if (strcmp(tok, word.word) == 0) {
-          wordMatches[k - 1] += 1;
-        }
-      }
-      if (wordMatches[k - 1] > maxMatches) {
-        maxMatches = wordMatches[k - 1];
+      checkDictionary(tok, &dictMatches);
+      if (dictMatches > maxMatches) {
+        maxMatches = dictMatches;
         *key = k;
-        strcpy(plaintext, cipherdup);
+        strcpy(plaintext, decryption);
       }
       tok = strtok(NULL, delim);
     }
   }
-  free(wordMatches);
-  return 1;
+  return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
