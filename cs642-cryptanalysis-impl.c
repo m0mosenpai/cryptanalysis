@@ -19,6 +19,13 @@
 #include <string.h>
 #include <stdlib.h>
 
+const int NALPHABETS = 26;
+
+char rotateChar(char chr, int x) {
+  int rotChr = (int)chr - x;
+  return rotChr < (int)'A' ? (int)'Z' - ((int)'A' - rotChr) + 1: (char)rotChr;
+}
+
 
 //
 // Functions
@@ -56,30 +63,39 @@ int cs642StudentInit(void) {
 int cs642PerformROTXCryptanalysis(char *ciphertext, int clen, char *plaintext,
                                   int plen, uint8_t *key) {
 
-  int i;
+  int i, j;
   uint8_t k;
   char *cipherdup = strdup(ciphertext);
   int dictSize = cs642GetDictSize();
+  int *wordMatches = calloc(NALPHABETS - 1, sizeof(int));
+  int maxMatches = 0;
 
-  for (i = 0; i < dictSize; i++) {
-      struct DictWord word = cs642GetWordfromDict(i);
-      printf("%s --> %d\n", word.word, word.count);
-  }
-
-  for (k = 1; k < 26; k++) {
-      for (i = 0; i < clen; i++) {
-          if (ciphertext[i] == ' ')
-              continue;
-
-          int rotChr = (int)ciphertext[i] - k;
-          cipherdup[i] = rotChr < (int)'A' ? (int)'Z' - ((int)'A' - rotChr) + 1: (char)rotChr;
+  for (k = 1; k < NALPHABETS; k++) {
+    for (i = 0; i < clen; i++) {
+      if (ciphertext[i] == ' ')
+        continue;
+      cipherdup[i] = rotateChar(ciphertext[i], k);
+    }
+    char *cipherdup2 = strdup(cipherdup);
+    char *delim = " ";
+    char *tok = strtok(cipherdup2, delim);
+    while (tok != NULL) {
+      for (j = 0; j < dictSize; j++) {
+        struct DictWord word = cs642GetWordfromDict(j);
+        if (strcmp(tok, word.word) == 0) {
+          wordMatches[k - 1] += 1;
+        }
       }
-      printf("[ROT %d] Possible Plaintext: %s\n", k, cipherdup);
+      if (wordMatches[k - 1] > maxMatches) {
+        maxMatches = wordMatches[k - 1];
+        *key = k;
+        strcpy(plaintext, cipherdup);
+      }
+      tok = strtok(NULL, delim);
+    }
   }
-  /*int result = cs642Decrypt(CIPHER_ROTX, (char*)key, 11, plaintext, plen, ciphertext, clen);*/
-
-  // Return successfully
-  return (0);
+  free(wordMatches);
+  return 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
