@@ -21,7 +21,7 @@
 
 const int NALPHABETS = 26;
 
-char rotateChar(char chr, int x) {
+char rotByX(char chr, int x) {
   int rotChr = (int)chr - x;
   return rotChr < (int)'A' ? (int)'Z' - ((int)'A' - rotChr) + 1: (char)rotChr;
 }
@@ -84,7 +84,7 @@ int cs642PerformROTXCryptanalysis(char *ciphertext, int clen, char *plaintext,
     for (i = 0; i < clen; i++) {
       if (ciphertext[i] == ' ')
         continue;
-      decryption[i] = rotateChar(ciphertext[i], k);
+      decryption[i] = rotByX(ciphertext[i], k);
     }
     char *decryptionDup = strdup(decryption);
     char *delim = " ";
