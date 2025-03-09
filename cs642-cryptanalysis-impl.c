@@ -21,6 +21,13 @@
 
 const int NALPHABETS = 26;
 
+void printMatrix(char **matrix, int size) {
+    printf("[LOG] Matrix:\n");
+    for (int i = 0; i < size; i++) {
+      printf("%s\n", matrix[i]);
+    }
+}
+
 char rotByX(char chr, int x) {
   int rotChr = (int)chr - x;
   return rotChr < (int)'A' ? (int)'Z' - ((int)'A' - rotChr) + 1: (char)rotChr;
@@ -36,6 +43,29 @@ void checkDictionary(char *inputWord, int *dictMatches) {
       *dictMatches = *dictMatches + 1;
     }
   }
+}
+
+char **createCipherMatrix(char *ciphertext, int clen, int rows, int cols) {
+  char **cipherMatrix = malloc(rows * sizeof(char*));
+
+  int idx = -1;
+  int cnt = 0;
+  char *ptr = ciphertext;
+  while (ptr != NULL && idx < rows) {
+    int chrIdx = cnt % cols;
+    if (chrIdx == 0) {
+      if (idx >= 0) {
+        cipherMatrix[idx][cols] = '\0';
+      }
+      idx++;
+      cipherMatrix[idx] = malloc(cols * sizeof(char) + 1);
+    }
+    /*printf("[LOG] idx: %d, chrIdx: %d, ptr -> %c\n", idx, chrIdx, *ptr);*/
+    cipherMatrix[idx][chrIdx] = *ptr;
+    ptr++;
+    cnt++;
+  }
+  return cipherMatrix;
 }
 
 
@@ -118,7 +148,25 @@ int cs642PerformROTXCryptanalysis(char *ciphertext, int clen, char *plaintext,
 int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
                                   int plen, char *key) {
 
-  // ADD CODE HERE
+  // 1. Convert Ciphertext to matrix with columns from 6 - 11
+  // 2. Friedman's Test for each column
+  // 3. Average tests together
+  // 4. Do the same for all other column sizes
+  // 5. Key size is the max of all average tests
+  // 6. Treat each column as a separate ROTX
+  // 7. Key is the one that gets the lowest Chi-Squared value
+
+  /*char *testString = "abc defg something lmao amazing random";*/
+  /*int testSize = strlen(testString);*/
+  /*printf("[LOG] testString: %s, length: %d\n", testString, testSize);*/
+
+  int keySize;
+  for (keySize = 6; keySize < 12; keySize++) {
+    int rows = (clen % keySize) == 0 ? (clen / keySize) : (clen / keySize + 1);
+    char **cipherMatrix = createCipherMatrix(ciphertext, clen, rows, keySize);
+    printMatrix(cipherMatrix, rows);
+  }
+
 
   // Return successfully
   return (0);
