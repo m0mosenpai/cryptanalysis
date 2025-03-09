@@ -18,8 +18,12 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
-const int NALPHABETS = 26;
+#define NALPHABETS 26
+#define Kp 0.067
+#define Kr 0.0385
+
 
 void printMatrix(char **matrix, int size) {
     printf("[LOG] Matrix:\n");
@@ -45,9 +49,17 @@ void checkDictionary(char *inputWord, int *dictMatches) {
   }
 }
 
-char **createCipherMatrix(char *ciphertext, int clen, int rows, int cols) {
-  char **cipherMatrix = malloc(rows * sizeof(char*));
+void getLetterCounts(char *ciphertext, int clen, int *counts) {
+  for (int i = 0; i < clen; i++) {
+    char chr = ciphertext[i];
+    if (isupper(chr)) {
+      int idx = (int)chr - (int)'A';
+      counts[idx]++;
+    }
+  }
+}
 
+void createCipherMatrix(char *ciphertext, int clen, char **matrix, int rows, int cols) {
   int idx = -1;
   int cnt = 0;
   char *ptr = ciphertext;
@@ -55,17 +67,16 @@ char **createCipherMatrix(char *ciphertext, int clen, int rows, int cols) {
     int chrIdx = cnt % cols;
     if (chrIdx == 0) {
       if (idx >= 0) {
-        cipherMatrix[idx][cols] = '\0';
+        matrix[idx][cols] = '\0';
       }
       idx++;
-      cipherMatrix[idx] = malloc(cols * sizeof(char) + 1);
+      matrix[idx] = malloc(cols * sizeof(char) + 1);
     }
     /*printf("[LOG] idx: %d, chrIdx: %d, ptr -> %c\n", idx, chrIdx, *ptr);*/
-    cipherMatrix[idx][chrIdx] = *ptr;
+    matrix[idx][chrIdx] = *ptr;
     ptr++;
     cnt++;
   }
-  return cipherMatrix;
 }
 
 
@@ -148,7 +159,7 @@ int cs642PerformROTXCryptanalysis(char *ciphertext, int clen, char *plaintext,
 int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
                                   int plen, char *key) {
 
-  // 1. Convert Ciphertext to matrix with columns from 6 - 11
+  // 1. [DONE] Convert Ciphertext to matrix with columns from 6 - 11
   // 2. Friedman's Test for each column
   // 3. Average tests together
   // 4. Do the same for all other column sizes
@@ -156,15 +167,23 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
   // 6. Treat each column as a separate ROTX
   // 7. Key is the one that gets the lowest Chi-Squared value
 
-  /*char *testString = "abc defg something lmao amazing random";*/
-  /*int testSize = strlen(testString);*/
-  /*printf("[LOG] testString: %s, length: %d\n", testString, testSize);*/
+  char *test = "ABC DEFG SOMETHING LMAO AMAZING RANDOM";
+  int tlen = strlen(test);
+  printf("[LOG] testString: %s, length: %d\n", test, tlen);
 
   int keySize;
+  int letterCnts[NALPHABETS] = {0};
+  getLetterCounts(test, tlen, letterCnts);
+  /*for (int i = 0; i < NALPHABETS; i++) {*/
+  /*    printf("%c: %d\n", (char)((int)'A' + i), letterCnts[i]);*/
+  /*}*/
   for (keySize = 6; keySize < 12; keySize++) {
-    int rows = (clen % keySize) == 0 ? (clen / keySize) : (clen / keySize + 1);
-    char **cipherMatrix = createCipherMatrix(ciphertext, clen, rows, keySize);
-    printMatrix(cipherMatrix, rows);
+    /*int rows = (clen % keySize) == 0 ? (clen / keySize) : (clen / keySize + 1);*/
+    int rows = (tlen % keySize) == 0 ? (tlen / keySize) : (tlen / keySize + 1);
+    int cols = keySize;
+    char **cipherMatrix = malloc(rows * sizeof(char*));
+    /*createCipherMatrix(ciphertext, clen, cipherMatrix, rows, cols);*/
+    createCipherMatrix(test, tlen, cipherMatrix, rows, cols);
   }
 
 
