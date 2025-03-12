@@ -292,11 +292,11 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
   /*}*/
   char *finalKey = malloc(rows * sizeof(char));
   for (i = 0; i < rows; i++) {
-    N = 0;
     char *subcipher = strdup(maxFriedmanMatrix[i]);
     minChiScore = INFINITY;
     for (k = 1; k < NALPHABETS; k++) {
       /*printf("[LOG] trying ROT-%d\n", k);*/
+      N = 0;
       for (j = 0; j < strlen(subcipher); j++) {
         char chr = maxFriedmanMatrix[i][j];
         if (isupper(chr)) {
@@ -304,6 +304,7 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
           N++;
         }
       }
+      /*printf("[LOG] subcipher len: %zu, chars: %d\n", strlen(subcipher), N);*/
       chiScore = chiSquared(subcipher, N, dictFreqs, dictLetters);
       /*printf("[LOG] chi score: %f\n", chiScore);*/
       if (chiScore < minChiScore) {
