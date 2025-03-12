@@ -27,34 +27,6 @@
 #define Kp 0.067
 #define Kr 0.0385
 
-const float E[NALPHABETS] = {
-    0.08167,
-    0.01492,
-    0.02782,
-    0.04253,
-    0.12702,
-    0.02228,
-    0.02015,
-    0.06094,
-    0.06966,
-    0.00153,
-    0.00772,
-    0.04025,
-    0.02406,
-    0.06749,
-    0.07507,
-    0.01929,
-    0.00095,
-    0.05987,
-    0.06327,
-    0.09056,
-    0.02758,
-    0.00978,
-    0.02360,
-    0.00150,
-    0.01974,
-    0.00074
-};
 
 void freev(void **ptr, int len, int free_seg) {
     if (len < 0) while (*ptr) { free(*ptr); *ptr++ = NULL; }
@@ -91,13 +63,33 @@ void checkDictionary(char *inputWord, int *dictMatches) {
 }
 
 void getLetterFreqs(char *ciphertext, int clen, int *counts) {
-  for (int i = 0; i < clen; i++) {
-    char chr = ciphertext[i];
+  int i, idx;
+  char chr;
+
+  for (i = 0; i < clen; i++) {
+    chr = ciphertext[i];
     if (isupper(chr)) {
-      int idx = (int)chr - (int)'A';
+      idx = (int)chr - (int)'A';
       counts[idx]++;
     }
   }
+}
+
+int getDictLetterFreqs(int *counts) {
+  int i, n;
+  int dictSize = cs642GetDictSize();
+  int total = 0;
+
+  for (i = 0; i < dictSize; i++) {
+    struct DictWord dictword = cs642GetWordfromDict(i);
+    n = strlen(dictword.word);
+    getLetterFreqs(dictword.word, n, counts);
+  }
+
+  for (i = 0; i < NALPHABETS; i++) {
+    total += counts[i];
+  }
+  return total;
 }
 
 void createCipherMatrix(char *ciphertext, int clen, int rows, int cols, char **matrix) {
@@ -115,7 +107,7 @@ void createCipherMatrix(char *ciphertext, int clen, int rows, int cols, char **m
 }
 
 float friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
-  int i, j, N;
+  int i, j, N = 0;
   float freqSum;
   float Ko, friedmanTotal = 0;
 
@@ -125,14 +117,14 @@ float friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
     for (j = 0; j < cols && cipherMatrix[i][j]; j++) {
       char chr = cipherMatrix[i][j];
       if (isupper(chr) || chr == ' ') {
+        if (isupper(chr)) N++;
         subcipher[j] = chr;
       }
     }
 
     // get letter frequencies in row
-    N = strlen(subcipher);
     int freqs[NALPHABETS] = {0};
-    getLetterFreqs(subcipher, N, freqs);
+    getLetterFreqs(subcipher, strlen(subcipher), freqs);
 
     // do Friedman's Test
     freqSum = 0;
@@ -153,19 +145,16 @@ float friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
   return friedmanTotal;
 }
 
-double chiSquared(char *cipher, int n) {
-  int i, idx;
-  double Oi, Ei, total = 0;
-  int O[NALPHABETS] = {0};
-  getLetterFreqs(cipher, n, O);
+double chiSquared(char *cipher, int cn, int *E, int en) {
+  int i;
+  double Ci, Ei, total = 0;
+  int C[NALPHABETS] = {0};
+  getLetterFreqs(cipher, strlen(cipher), C);
 
-  for (i = 0; i < n; i++) {
-    if (isupper(cipher[i])) {
-      idx = (int)cipher[i] - (int)'A';
-      Oi = O[idx];
-      Ei = E[idx] * n;
-      total += (pow(Oi - Ei, 2) / Ei);
-    }
+  for (i = 0; i < NALPHABETS; i++) {
+      Ci = (double)C[i] / cn;
+      Ei = (double)E[i] / en;
+      total += (pow(Ci - Ei, 2) / Ei);
   }
   return total;
 }
@@ -185,10 +174,7 @@ double chiSquared(char *cipher, int n) {
 // Outputs      : 0 if successful, -1 if failure
 
 int cs642StudentInit(void) {
-
-  // ADD CODE HERE IF NEEDED
-
-  // Return successfully
+  /*enableLogLevels(LOG_INFO_LEVEL);*/
   return (0);
 }
 
@@ -250,13 +236,15 @@ int cs642PerformROTXCryptanalysis(char *ciphertext, int clen, char *plaintext,
 int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
                                   int plen, char *key) {
 
-  int i, j, k;
-  int rows, cols;
+  int i, j, k, N;
+  int rows, cols, dictLetters;
+  int dictFreqs[NALPHABETS] = {0};
   char **cipherMatrix, **maxFriedmanMatrix;
   int keysize, maxFriedmanKeysize = 0;
   double friedman, friedmanAvg;
   double maxFriedmanAvg = 0;
-  double chiScore, minChiScore = INFINITY;
+  double chiScore, minChiScore;
+  int chiKey;
 
   // test all possible key sizes
   for (keysize = MIN_KEYSIZE; keysize < MAX_KEYSIZE; keysize++) {
@@ -282,27 +270,41 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
   printf("[LOG] maxFriedmanKeysize: %d\n", maxFriedmanKeysize);
 
   // brute-force the key with most-probable keysize
+  dictLetters = getDictLetterFreqs(dictFreqs);
+  /*printf("[LOG] dictLetters: %d\n", dictLetters);*/
+  /*for (i = 0; i < NALPHABETS; i++) {*/
+  /*    printf("%c -> %d, ", (char)((int)'A' + i), dictFreqs[i]);*/
+  /*}*/
   char *finalKey = malloc(maxFriedmanKeysize * sizeof(char));
-  for (i = 0; i < maxFriedmanKeysize; i++) {
-    int N = strlen(maxFriedmanMatrix[i]);
+  for (i = 0; i < rows; i++) {
+    N = 0;
     char *subcipher = strdup(maxFriedmanMatrix[i]);
+    minChiScore = INFINITY;
     for (k = 1; k < NALPHABETS; k++) {
-      for (j = 0; j < N; j++) {
+      /*printf("[LOG] trying ROT-%d\n", k);*/
+      for (j = 0; j < strlen(subcipher); j++) {
         char chr = maxFriedmanMatrix[i][j];
         if (isupper(chr)) {
           subcipher[j] = rotByX(chr, k);
+          N++;
         }
       }
-      chiScore = chiSquared(subcipher, N);
+      chiScore = chiSquared(subcipher, N, dictFreqs, dictLetters);
+      /*printf("[LOG] chi score: %f\n", chiScore);*/
       if (chiScore < minChiScore) {
         minChiScore = chiScore;
+        chiKey = k;
+        /*printf("[LOG] min chi score: %f, key: %d\n", chiScore, k);*/
         finalKey[i] = (char)((int)'A' + k);
       }
     }
+    printf("[LOG] row: %d -> key: %d\n", i, chiKey);
   }
+  finalKey[i] = '\0';
   strcpy(key, finalKey);
-  printf("[LOG] output key: %s\n", key);
+  printf("[LOG] output key: %s, length: %zu\n", key, strlen(finalKey));
   cs642Decrypt(CIPHER_VIGE, key, maxFriedmanKeysize, plaintext, plen, ciphertext, clen);
+  printf("[LOG] ciphertext: %s\n", ciphertext);
 
   free(finalKey);
   freev((void*)maxFriedmanMatrix, rows, 1);
