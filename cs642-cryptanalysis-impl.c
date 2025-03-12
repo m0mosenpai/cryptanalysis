@@ -92,14 +92,17 @@ int getDictLetterFreqs(int *counts) {
   return total;
 }
 
-void createCipherMatrix(char *ciphertext, int clen, int rows, int cols, char **matrix) {
+void createCipherMatrix(char *ciphertext, int clen, int rows, int cols, char **matrix, int spaces) {
   int i, j, c_i = 0;
+  char chr;
 
   for (j = 0; j < cols; j++) {
     for (i = 0; i < rows; i++) {
       /*printf("[LOG] ciphertext chr: %c, idx: %d\n", ciphertext[c_i], c_i);*/
       if (j == 0) matrix[i] = malloc(cols * sizeof(char));
-      if (c_i >= clen) {matrix[i][j] = '\0'; return;}
+      // to include/ not-include spaces in the matrix
+      while (!spaces && c_i < clen && ((chr = ciphertext[c_i]) == ' ')) { c_i++; }
+      if (c_i >= clen) { matrix[i][j] = '\0'; return; }
       matrix[i][j] = ciphertext[c_i++];
       /*printf("[LOG] matrix chr: %c\n", matrix[i][j]);*/
     }
@@ -108,7 +111,7 @@ void createCipherMatrix(char *ciphertext, int clen, int rows, int cols, char **m
 
 float friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
   int i, j, N = 0;
-  float freqSum;
+  float freqSum,friedman;
   float Ko, friedmanTotal = 0;
 
   for (i = 0; i < rows; i++) {
@@ -246,16 +249,23 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
   double chiScore, minChiScore;
   int chiKey;
 
+  /*char *test = "THIS IS A RANDOM STRING";*/
+  /*int tlen = strlen(test);*/
+
   // test all possible key sizes
   for (keysize = MIN_KEYSIZE; keysize < MAX_KEYSIZE; keysize++) {
     rows = keysize;
-    cols = (clen % keysize) == 0 ? (clen / keysize): (clen / keysize + 1);
+    cols = (clen % rows) == 0 ? (clen / rows): (clen / rows + 1);
+    /*cols = (tlen % rows) == 0 ? (tlen / rows): (tlen / rows + 1);*/
     // transposed matrix - each row is a rotx cipher
     cipherMatrix = malloc(rows * sizeof(char*));
-    createCipherMatrix(ciphertext, clen, rows, cols, cipherMatrix);
+    createCipherMatrix(ciphertext, clen, rows, cols, cipherMatrix, 1);
+    /*createCipherMatrix(test, tlen, rows, cols, cipherMatrix, 1);*/
+    /*printMatrix(cipherMatrix, rows, cols);*/
     friedman = friedmanTotal(cipherMatrix, clen, rows, cols);
+    /*friedman = friedmanTotal(cipherMatrix, tlen, rows, cols);*/
     friedmanAvg = friedman / keysize;
-    printf("[LOG] [Keysize: %d] Friedman Total: %f, FriedmanAvg: %f\n", keysize, friedman, friedmanAvg);
+    /*printf("[LOG] [Keysize: %d] Friedman Total: %f, FriedmanAvg: %f\n", keysize, friedman, friedmanAvg);*/
     if (friedmanAvg > maxFriedmanAvg) {
       maxFriedmanAvg = friedmanAvg;
       maxFriedmanKeysize = keysize;
@@ -263,10 +273,15 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
     freev((void*)cipherMatrix, rows, 1);
   }
 
+
   rows = maxFriedmanKeysize;
-  cols = (clen % keysize) == 0 ? (clen / keysize): (clen / keysize + 1);
+  cols = (clen % rows) == 0 ? (clen / rows): (clen / rows + 1);
+  /*cols = (tlen % rows) == 0 ? (tlen / rows): (tlen / rows + 1);*/
   maxFriedmanMatrix = malloc(rows * sizeof(char*));
-  createCipherMatrix(ciphertext, clen, rows, cols, maxFriedmanMatrix);
+  createCipherMatrix(ciphertext, clen, rows, cols, maxFriedmanMatrix, 1);
+  /*createCipherMatrix(test, tlen, rows, cols, maxFriedmanMatrix, 0);*/
+  /*printMatrix(maxFriedmanMatrix, rows, cols);*/
+  /*exit(0);*/
   printf("[LOG] maxFriedmanKeysize: %d\n", maxFriedmanKeysize);
 
   // brute-force the key with most-probable keysize
@@ -275,7 +290,7 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
   /*for (i = 0; i < NALPHABETS; i++) {*/
   /*    printf("%c -> %d, ", (char)((int)'A' + i), dictFreqs[i]);*/
   /*}*/
-  char *finalKey = malloc(maxFriedmanKeysize * sizeof(char));
+  char *finalKey = malloc(rows * sizeof(char));
   for (i = 0; i < rows; i++) {
     N = 0;
     char *subcipher = strdup(maxFriedmanMatrix[i]);
@@ -304,7 +319,7 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
   strcpy(key, finalKey);
   printf("[LOG] output key: %s, length: %zu\n", key, strlen(finalKey));
   cs642Decrypt(CIPHER_VIGE, key, maxFriedmanKeysize, plaintext, plen, ciphertext, clen);
-  printf("[LOG] ciphertext: %s\n", ciphertext);
+  printf("[LOG] ciphertext: %s, length: %d\n", ciphertext, clen);
 
   free(finalKey);
   freev((void*)maxFriedmanMatrix, rows, 1);
