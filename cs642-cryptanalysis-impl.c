@@ -6,7 +6,7 @@
 //                   performs cryptanalysis on ciphertext of different ciphers.
 //                   See associated documentation for more information.
 //
-//   Author        : *** INSERT YOUR NAME ***
+//   Author        : *** SARTHAK KHATTAR ***
 //   Last Modified : *** DATE ***
 //
 
@@ -37,7 +37,6 @@ void freev(void **ptr, int len, int free_seg) {
 void printMatrix(char **matrix, int rows, int cols) {
   printf("[LOG] Matrix:\n");
   for (int i = 0; i < rows; i++) {
-    /*printf("%s\n", matrix[i]);*/
     for (int j = 0; j < cols; j++) {
       printf("%c", matrix[i][j]);
     }
@@ -98,24 +97,23 @@ void createCipherMatrix(char *ciphertext, int clen, int rows, int cols, char **m
 
   for (j = 0; j < cols; j++) {
     for (i = 0; i < rows; i++) {
-      /*printf("[LOG] ciphertext chr: %c, idx: %d\n", ciphertext[c_i], c_i);*/
       if (j == 0) matrix[i] = malloc(cols * sizeof(char));
       // to include/ not-include spaces in the matrix
       while (!spaces && c_i < clen && ((chr = ciphertext[c_i]) == ' ')) { c_i++; }
       if (c_i >= clen) { matrix[i][j] = '\0'; return; }
       matrix[i][j] = ciphertext[c_i++];
-      /*printf("[LOG] matrix chr: %c\n", matrix[i][j]);*/
     }
   }
 }
 
-float friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
-  int i, j, N = 0;
-  float freqSum,friedman;
-  float Ko, friedmanTotal = 0;
+double friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
+  int i, j, N;
+  double freqSum;
+  double Ko, friedmanTotal = 0;
 
   for (i = 0; i < rows; i++) {
     // take each row value as a separate rotx cipher
+    N = 0;
     char subcipher[cols];
     for (j = 0; j < cols && cipherMatrix[i][j]; j++) {
       char chr = cipherMatrix[i][j];
@@ -136,14 +134,7 @@ float friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
         freqSum += (freqs[j] * (freqs[j] - 1));
     }
     Ko = freqSum / (N * (N - 1));
-    /*friedman = (Kp - Kr) / (Ko - Kr);*/
-    /*friedmanTotal += friedman;*/
     friedmanTotal += Ko;
-
-    /*printf("[LOG] freqSum: %f\n", freqSum);*/
-    /*printf("[LOG] friedman: %f\n", friedman);*/
-    /*printf("[LOG] friedmanTotal: %f\n", friedmanTotal);*/
-    /*printf("[LOG] colMatrix row %s\n", subcipher);*/
   }
   return friedmanTotal;
 }
@@ -156,7 +147,7 @@ double chiSquared(char *cipher, int cn, int *E, int en) {
 
   for (i = 0; i < NALPHABETS; i++) {
       Ci = (double)C[i] / cn;
-      Ei = (double)E[i] / en;
+      Ei = ((double)E[i] / en) * cn;
       total += (pow(Ci - Ei, 2) / Ei);
   }
   return total;
@@ -177,7 +168,6 @@ double chiSquared(char *cipher, int cn, int *E, int en) {
 // Outputs      : 0 if successful, -1 if failure
 
 int cs642StudentInit(void) {
-  /*enableLogLevels(LOG_INFO_LEVEL);*/
   return (0);
 }
 
@@ -245,27 +235,18 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
   char **cipherMatrix, **maxFriedmanMatrix;
   int keysize, maxFriedmanKeysize = 0;
   double friedman, friedmanAvg;
-  double maxFriedmanAvg = 0;
+  double maxFriedmanAvg = -INFINITY;
   double chiScore, minChiScore;
-  int chiKey;
-
-  /*char *test = "THIS IS A RANDOM STRING";*/
-  /*int tlen = strlen(test);*/
 
   // test all possible key sizes
   for (keysize = MIN_KEYSIZE; keysize < MAX_KEYSIZE; keysize++) {
     rows = keysize;
     cols = (clen % rows) == 0 ? (clen / rows): (clen / rows + 1);
-    /*cols = (tlen % rows) == 0 ? (tlen / rows): (tlen / rows + 1);*/
     // transposed matrix - each row is a rotx cipher
     cipherMatrix = malloc(rows * sizeof(char*));
     createCipherMatrix(ciphertext, clen, rows, cols, cipherMatrix, 1);
-    /*createCipherMatrix(test, tlen, rows, cols, cipherMatrix, 1);*/
-    /*printMatrix(cipherMatrix, rows, cols);*/
     friedman = friedmanTotal(cipherMatrix, clen, rows, cols);
-    /*friedman = friedmanTotal(cipherMatrix, tlen, rows, cols);*/
-    friedmanAvg = friedman / keysize;
-    /*printf("[LOG] [Keysize: %d] Friedman Total: %f, FriedmanAvg: %f\n", keysize, friedman, friedmanAvg);*/
+    friedmanAvg = friedman / rows;
     if (friedmanAvg > maxFriedmanAvg) {
       maxFriedmanAvg = friedmanAvg;
       maxFriedmanKeysize = keysize;
@@ -276,26 +257,16 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
 
   rows = maxFriedmanKeysize;
   cols = (clen % rows) == 0 ? (clen / rows): (clen / rows + 1);
-  /*cols = (tlen % rows) == 0 ? (tlen / rows): (tlen / rows + 1);*/
   maxFriedmanMatrix = malloc(rows * sizeof(char*));
   createCipherMatrix(ciphertext, clen, rows, cols, maxFriedmanMatrix, 1);
-  /*createCipherMatrix(test, tlen, rows, cols, maxFriedmanMatrix, 0);*/
-  /*printMatrix(maxFriedmanMatrix, rows, cols);*/
-  /*exit(0);*/
-  printf("[LOG] maxFriedmanKeysize: %d\n", maxFriedmanKeysize);
 
   // brute-force the key with most-probable keysize
   dictLetters = getDictLetterFreqs(dictFreqs);
-  /*printf("[LOG] dictLetters: %d\n", dictLetters);*/
-  /*for (i = 0; i < NALPHABETS; i++) {*/
-  /*    printf("%c -> %d, ", (char)((int)'A' + i), dictFreqs[i]);*/
-  /*}*/
   char *finalKey = malloc(rows * sizeof(char));
   for (i = 0; i < rows; i++) {
     char *subcipher = strdup(maxFriedmanMatrix[i]);
     minChiScore = INFINITY;
-    for (k = 1; k < NALPHABETS; k++) {
-      /*printf("[LOG] trying ROT-%d\n", k);*/
+    for (k = 0; k < NALPHABETS; k++) {
       N = 0;
       for (j = 0; j < strlen(subcipher); j++) {
         char chr = maxFriedmanMatrix[i][j];
@@ -304,23 +275,16 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
           N++;
         }
       }
-      /*printf("[LOG] subcipher len: %zu, chars: %d\n", strlen(subcipher), N);*/
       chiScore = chiSquared(subcipher, N, dictFreqs, dictLetters);
-      /*printf("[LOG] chi score: %f\n", chiScore);*/
       if (chiScore < minChiScore) {
         minChiScore = chiScore;
-        chiKey = k;
-        /*printf("[LOG] min chi score: %f, key: %d\n", chiScore, k);*/
         finalKey[i] = (char)((int)'A' + k);
       }
     }
-    printf("[LOG] row: %d -> key: %d\n", i, chiKey);
   }
   finalKey[i] = '\0';
   strcpy(key, finalKey);
-  printf("[LOG] output key: %s, length: %zu\n", key, strlen(finalKey));
   cs642Decrypt(CIPHER_VIGE, key, maxFriedmanKeysize, plaintext, plen, ciphertext, clen);
-  printf("[LOG] ciphertext: %s, length: %d\n", ciphertext, clen);
 
   free(finalKey);
   freev((void*)maxFriedmanMatrix, rows, 1);
