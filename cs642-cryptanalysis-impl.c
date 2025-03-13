@@ -30,7 +30,7 @@
 #define NGRAMSIZE 4
 #define MAX_NGRAMS 456976
 #define SUBS_ITERS 10
-#define SUBS_SUBITERS 5000
+#define SUBS_SUBITERS 3000
 
 typedef struct lf {
   char letter;
