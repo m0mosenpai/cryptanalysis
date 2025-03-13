@@ -16,6 +16,7 @@
 // Project Include Files
 #include "cs642-cryptanalysis-support.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -24,31 +25,41 @@
 
 #define MIN_KEYSIZE 6
 #define MAX_KEYSIZE 12
-#define NALPHABETS 26
+#define NALPHA 26
 #define Kp 0.067
 #define Kr 0.0385
 #define NGRAMSIZE 4
 #define MAX_NGRAMS 456976
 #define SUBS_ITERS 10
-#define SUBS_SUBITERS 3000
+#define SUBS_SUBITERS 5000
 
 typedef struct lf {
   char letter;
   int freq;
 } LF;
 
+// free 2D arrays
 void freev(void **ptr, int len, int free_seg) {
   if (len < 0) while (*ptr) { free(*ptr); *ptr++ = NULL; }
   else { for (int i = 0; i < len; i++) free(ptr[i]); }
   if (free_seg) free(ptr);
 }
 
+// swap two indices
+void swap(int a, int b, char *array) {
+  char tmp = array[a];
+  array[a] = array[b];
+  array[b] = tmp;
+}
+
+// sorting in descending order of freq
 int comparator(const void *a, const void *b) {
     LF *A = (LF *)a;
     LF *B = (LF *)b;
     return (B->freq - A->freq);
 }
 
+// display cipher matrix
 void printMatrix(char **matrix, int rows, int cols) {
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
@@ -58,11 +69,13 @@ void printMatrix(char **matrix, int rows, int cols) {
   }
 }
 
+// shift a char left by x
 char rotByX(char chr, int x) {
   int rotChr = (int)chr - x;
   return rotChr < (int)'A' ? (int)'Z' - ((int)'A' - rotChr) + 1: (char)rotChr;
 }
 
+// get num of occurrences of a word in the given dict
 void checkDictionary(char *inputWord, int *dictMatches) {
   int j;
   int dictSize = cs642GetDictSize();
@@ -75,6 +88,7 @@ void checkDictionary(char *inputWord, int *dictMatches) {
   }
 }
 
+// get letter frequencies in a given ciphertext
 void getLetterFreqs(char *ciphertext, int clen, int *counts) {
   int i, idx;
   char chr;
@@ -88,6 +102,7 @@ void getLetterFreqs(char *ciphertext, int clen, int *counts) {
   }
 }
 
+// get letter frequencies in the given dict
 int getDictLetterFreqs(int *counts) {
   int i, n;
   int dictSize = cs642GetDictSize();
@@ -99,12 +114,13 @@ int getDictLetterFreqs(int *counts) {
     getLetterFreqs(dictword.word, n, counts);
   }
 
-  for (i = 0; i < NALPHABETS; i++) {
+  for (i = 0; i < NALPHA; i++) {
     total += counts[i];
   }
   return total;
 }
 
+// create transposed ciphermatrix for vigenere, where rows = keysize
 void createCipherMatrix(char *ciphertext, int clen, int rows, int cols, char **matrix, int spaces) {
   int i, j, c_i = 0;
   char chr;
@@ -120,6 +136,7 @@ void createCipherMatrix(char *ciphertext, int clen, int rows, int cols, char **m
   }
 }
 
+// compute the Friedman's Test on a given cipher matrix
 double friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
   int i, j, N;
   double freqSum;
@@ -138,12 +155,12 @@ double friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
     }
 
     // get letter frequencies in row
-    int freqs[NALPHABETS] = {0};
+    int freqs[NALPHA] = {0};
     getLetterFreqs(subcipher, strlen(subcipher), freqs);
 
     // do Friedman's Test
     freqSum = 0;
-    for (j = 0; j < NALPHABETS; j++) {
+    for (j = 0; j < NALPHA; j++) {
       if (freqs[j] > 0)
         freqSum += (freqs[j] * (freqs[j] - 1));
     }
@@ -153,13 +170,14 @@ double friedmanTotal(char **cipherMatrix, int clen, int rows, int cols) {
   return friedmanTotal;
 }
 
+// compute the Chi-Squared Test for a given ciphertext
 double chiSquared(char *cipher, int cn, int *E, int en) {
   int i;
   double Ci, Ei, total = 0;
-  int C[NALPHABETS] = {0};
+  int C[NALPHA] = {0};
   getLetterFreqs(cipher, strlen(cipher), C);
 
-  for (i = 0; i < NALPHABETS; i++) {
+  for (i = 0; i < NALPHA; i++) {
     Ci = (double)C[i] / cn;
     Ei = ((double)E[i] / en) * cn;
     total += (pow(Ci - Ei, 2) / Ei);
@@ -167,6 +185,7 @@ double chiSquared(char *cipher, int cn, int *E, int en) {
   return total;
 }
 
+// get all 4-grams in the given dicionary for substition cipher
 int getDictNGrams(char ngrams[][NGRAMSIZE]) {
   int i, j, k, n, cnt = 0;
   char ngram[NGRAMSIZE];
@@ -185,6 +204,7 @@ int getDictNGrams(char ngrams[][NGRAMSIZE]) {
   return cnt;
 }
 
+// get all 4-gram probabilities in a dict 4-gram list
 double getDictNGramProb(char *ngram, char dictNGrams[][NGRAMSIZE], double dictNGramProbs[], int dngcnt) {
   int i = 0;
   for (i = 0; i < dngcnt; i++) {
@@ -196,6 +216,7 @@ double getDictNGramProb(char *ngram, char dictNGrams[][NGRAMSIZE], double dictNG
   return log(1.0 / dngcnt);
 }
 
+// get log probability of a 4-gram
 double getNGramProb(char *ngram, char ngrams[][NGRAMSIZE], int n) {
   int i, cnt = 0;
   for (i = 0; i < n; i++) {
@@ -206,6 +227,7 @@ double getNGramProb(char *ngram, char ngrams[][NGRAMSIZE], int n) {
   return log((double)cnt / n);
 }
 
+// get log prob sum of all 4-grams in a given ciphertext, compared to 4-grams in a dict
 double cipherNGPSum(char *ciphertext, char dictNGrams[][NGRAMSIZE], double dictNGramProbs[], int dngcnt) {
   int i, j, n;
   char *cipherdup;
@@ -230,23 +252,73 @@ double cipherNGPSum(char *ciphertext, char dictNGrams[][NGRAMSIZE], double dictN
   return ngpsum;
 }
 
-void generateRandomKey(char key[NALPHABETS + 1]) {
+void getInitFreqDerivedKey(char *ciphertext, int clen, char key[NALPHA + 1]) {
+  int i, j;
+  LF dictFreqMap[NALPHA], cipherFreqMap[NALPHA];
+
+  // map dict letters to freqs
+  int dictFreqs[NALPHA] = {0};
+  int cipherFreqs[NALPHA] = {0};
+  getDictLetterFreqs(dictFreqs);
+  getLetterFreqs(ciphertext, clen, cipherFreqs);
+  for (i = 0; i < NALPHA; i++) {
+      LF lfMap1 = { (char)((int)'A' + i), dictFreqs[i] };
+      dictFreqMap[i] = lfMap1;
+
+      LF lfMap2 = { (char)((int)'A' + i), cipherFreqs[i] };
+      cipherFreqMap[i] = lfMap2;
+  }
+
+  // sort both in descending order of freq
+  qsort(dictFreqMap, NALPHA, sizeof(LF), comparator);
+  qsort(cipherFreqMap, NALPHA, sizeof(LF), comparator);
+
+  // construct initial freq derived key
+  for (i = 0; i < NALPHA; i++) {
+    char curr = key[i];
+    for (j = 0; j < NALPHA; j++) {
+      if (dictFreqMap[j].letter == curr) {
+        key[i] = cipherFreqMap[j].letter;
+        break;
+      }
+    }
+  }
+  key[NALPHA] = '\0';
+}
+
+// generate a random substition cipher key (Fisher-Yates shuffling)
+void generateRandomKey(char key[NALPHA + 1]) {
   int i, j;
   char tmp;
 
-  for (i = 0; i < NALPHABETS; i++) {
+  for (i = 0; i < NALPHA; i++) {
     key[i] = 'A' + i;
   }
 
-  for (i = NALPHABETS - 1; i > 0; i--) {
+  for (i = NALPHA - 1; i > 0; i--) {
     j = rand() % (i + 1);
     tmp = key[i];
     key[i] = key[j];
     key[j] = tmp;
   }
-  key[NALPHABETS] = '\0';
+  key[NALPHA] = '\0';
 }
 
+int checkBestKey(char *plaintext) {
+  int dictMatches;
+  char *word, *ptextdup, *delim = " ";
+
+  ptextdup = strdup(plaintext);
+  word = strtok(ptextdup, delim);
+  while (word != NULL) {
+    dictMatches = 0;
+    checkDictionary(word, &dictMatches);
+    if (dictMatches == 0) return -1;
+      word = strtok(NULL, delim);
+  }
+  // if all words in plaintext exist in the dictionary
+  return 0;
+}
 
 //
 // Functions
@@ -280,22 +352,24 @@ int cs642StudentInit(void) {
 int cs642PerformROTXCryptanalysis(char *ciphertext, int clen, char *plaintext,
                                   int plen, uint8_t *key) {
 
-  int i;
+  int i, dictMatches, r;
   uint8_t k;
   char *decryption = strdup(ciphertext);
+  char *decryptionDup, *tok, *delim = " ";
   int maxMatches = 0;
 
-  for (k = 1; k < NALPHABETS; k++) {
+  // test all possible rotations
+  for (k = 1; k < NALPHA; k++) {
     for (i = 0; i < clen; i++) {
       if (ciphertext[i] == ' ')
         continue;
       decryption[i] = rotByX(ciphertext[i], k);
     }
-    char *decryptionDup = strdup(decryption);
-    char *delim = " ";
-    char *tok = strtok(decryptionDup, delim);
-    int dictMatches = 0;
+    decryptionDup = strdup(decryption);
+    tok = strtok(decryptionDup, delim);
+    dictMatches = 0;
     while (tok != NULL) {
+      // select rotation with highest dict word matches
       checkDictionary(tok, &dictMatches);
       if (dictMatches > maxMatches) {
         maxMatches = dictMatches;
@@ -305,7 +379,10 @@ int cs642PerformROTXCryptanalysis(char *ciphertext, int clen, char *plaintext,
       tok = strtok(NULL, delim);
     }
   }
-  return 0;
+  if ((r = cs642Decrypt(CIPHER_ROTX, (char*)key, strlen((char*)key), plaintext, plen, ciphertext, clen)) == 0)
+    return 0;
+
+  return -1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -323,9 +400,11 @@ int cs642PerformROTXCryptanalysis(char *ciphertext, int clen, char *plaintext,
 int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
                                   int plen, char *key) {
 
-  int i, j, k, N;
+  int i, j, k, N, r;
   int rows, cols, dictLetters;
-  int dictFreqs[NALPHABETS] = {0};
+  int dictFreqs[NALPHA] = {0};
+  char chr;
+  char *subcipher, *finalKey;
   char **cipherMatrix, **maxFriedmanMatrix;
   int keysize, maxFriedmanKeysize = 0;
   double friedman, friedmanAvg;
@@ -357,15 +436,15 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
   // fetch dictionary frequencies
   dictLetters = getDictLetterFreqs(dictFreqs);
   // brute-force the key with most-probable keysize
-  char *finalKey = malloc(rows * sizeof(char));
+  finalKey = malloc(rows * sizeof(char));
   for (i = 0; i < rows; i++) {
-    char *subcipher = strdup(maxFriedmanMatrix[i]);
+    subcipher = strdup(maxFriedmanMatrix[i]);
     minChiScore = INFINITY;
-    for (k = 0; k < NALPHABETS; k++) {
+    for (k = 0; k < NALPHA; k++) {
       N = 0;
       // each row is rotx cipher in transposed matrix
       for (j = 0; j < strlen(subcipher); j++) {
-        char chr = maxFriedmanMatrix[i][j];
+        chr = maxFriedmanMatrix[i][j];
         if (isupper(chr)) {
           subcipher[j] = rotByX(chr, k);
           N++;
@@ -381,11 +460,13 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
   }
   finalKey[i] = '\0';
   strcpy(key, finalKey);
-  cs642Decrypt(CIPHER_VIGE, key, maxFriedmanKeysize, plaintext, plen, ciphertext, clen);
-
   free(finalKey);
   freev((void*)maxFriedmanMatrix, rows, 1);
-  return (0);
+
+  if ((r = cs642Decrypt(CIPHER_VIGE, key, maxFriedmanKeysize, plaintext, plen, ciphertext, clen) == 0))
+    return 0;
+
+  return -1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -403,85 +484,71 @@ int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
 int cs642PerformSUBSCryptanalysis(char *ciphertext, int clen, char *plaintext,
                                   int plen, char *key) {
 
-  int i, j, dngcnt;
+  int i, j, dngcnt, i1, i2, r;
   char dictNGrams[MAX_NGRAMS][NGRAMSIZE];
   double dictNGramProbs[MAX_NGRAMS];
-  LF dictFreqMap[NALPHABETS], cipherFreqMap[NALPHABETS];
   double score, bestScore = -INFINITY;
-  char subsKey[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", bestKey[NALPHABETS];
+  char freqKey[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", bestKey[NALPHA];
+  char subsKey[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  clock_t start, end;
 
   // pre-compute dictionary ngrams and their probabilities
   dngcnt = getDictNGrams(dictNGrams);
-  /*printf("[LOG] total dict ngrams: %d\n", dngcnt);*/
   for (i = 0; i < dngcnt; i++) {
-    /*printf("%.4s\n", dictNGrams[i]);*/
     dictNGramProbs[i] = getNGramProb(dictNGrams[i], dictNGrams, dngcnt);
   }
 
-  // map dict letters to freqs
-  int dictFreqs[NALPHABETS] = {0};
-  getDictLetterFreqs(dictFreqs);
-  for (i = 0; i < NALPHABETS; i++) {
-      LF lfMap = { (char)((int)'A' + i), dictFreqs[i] };
-      dictFreqMap[i] = lfMap;
-  }
-  // map cipher letters to freqs
-  int cipherFreqs[NALPHABETS] = {0};
-  getLetterFreqs(ciphertext, clen, cipherFreqs);
-  for (i = 0; i < NALPHABETS; i++) {
-      LF lfMap = { (char)((int)'A' + i), cipherFreqs[i] };
-      cipherFreqMap[i] = lfMap;
-  }
-  // sort both in descending order of freq
-  qsort(dictFreqMap, NALPHABETS, sizeof(LF), comparator);
-  qsort(cipherFreqMap, NALPHABETS, sizeof(LF), comparator);
+  // start with a frequency derived key
+  getInitFreqDerivedKey(ciphertext, clen, freqKey);
 
-  // construct initial freq derived key
-  for (i = 0; i < strlen(subsKey); i++) {
-    char curr = subsKey[i];
-    for (j = 0; j < NALPHABETS; j++) {
-      if (dictFreqMap[j].letter == curr) {
-        subsKey[i] = cipherFreqMap[j].letter;
-        break;
-      }
-    }
-  }
-
-  // try different keys
   srand(time(NULL));
+  start = clock();
   for (i = 0; i < SUBS_ITERS; i++) {
-    if (i > 0) { generateRandomKey(subsKey); }
+    /*if (i > 0) generateRandomKey(subsKey);*/
+    strcpy(subsKey, freqKey);
+    bestScore = -INFINITY;
+    // try permutations of the current key for some time
     for (j = 0; j < SUBS_SUBITERS; j++) {
       // choose random indices to swap
-      int i1 = rand() % NALPHABETS;
-      int i2 = rand() % NALPHABETS;
+      i1 = rand() % NALPHA;
+      i2 = rand() % NALPHA;
       while (i1 == i2)
-        i2 = rand() % NALPHABETS;
+        i2 = rand() % NALPHA;
 
       // swap
-      char tmp = subsKey[i1];
-      subsKey[i1] = subsKey[i2];
-      subsKey[i2] = tmp;
+      swap(i1, i2, subsKey);
 
-      // decrypt and get score
-      cs642Decrypt(CIPHER_SUBS, subsKey, NALPHABETS, plaintext, plen, ciphertext, clen);
+      // decrypt and get score, and save it if better than best score
+      cs642Decrypt(CIPHER_SUBS, subsKey, NALPHA, plaintext, plen, ciphertext, clen);
       score = cipherNGPSum(plaintext, dictNGrams, dictNGramProbs, dngcnt);
+      printf("[LOG] round-%d (iter: %d of %d) - key: %s, score: %f\n", i, j, SUBS_SUBITERS, subsKey, score);
       if (score > bestScore) {
         bestScore = score;
         strcpy(bestKey, subsKey);
+        printf("[LOG] bestKey: %s, bestScore: %f\n", bestKey, bestScore);
       } else {
-        // revert swap
-        tmp = subsKey[i1];
-        subsKey[i1] = subsKey[i2];
-        subsKey[i2] = tmp;
+        // revert the swap
+        swap(i1, i2, subsKey);
       }
+    }
+    printf("[LOG] [round #%d complete] bestKey: %s, bestScore: %f\n", i, bestKey, bestScore);
+
+    // decrypt using the best key & check if the plaintext contains words in the dict
+    cs642Decrypt(CIPHER_SUBS, bestKey, NALPHA, plaintext, plen, ciphertext, clen);
+    if (checkBestKey(plaintext) == 0) {
+      strcpy(key, bestKey);
+      end = clock();
+      printf("[LOG] key successfully recovered! (took: %0.5f sec)\n", ((double)(end - start) / CLOCKS_PER_SEC));
+      return 0;
     }
   }
 
   // decrypt using the best key
-  cs642Decrypt(CIPHER_SUBS, bestKey, NALPHABETS, plaintext, plen, ciphertext, clen);
+  strcpy(key, bestKey);
+  if ((r = cs642Decrypt(CIPHER_SUBS, key, NALPHA, plaintext, plen, ciphertext, clen) == 0))
+    return 0;
 
-  return (0);
+  return -1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
